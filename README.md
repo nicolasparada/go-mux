@@ -11,8 +11,8 @@ go get github.com/nicolasparada/go-mux
 ```go
 func main() {
   m := mux.New()
-  m.HandleFunc("/hello/{name}", helloWorld)
-  m.Handle("/*", http.FileServer(http.Dir("static")))
+  m.HandleFunc(http.MethodGet, "/hello/{name}", helloWorld)
+  m.Handle(http.MethodGet, "/*", http.FileServer(http.Dir("static")))
 
   http.ListenAndServe(":5000", m)
 }
