@@ -11,12 +11,11 @@ import (
 var keyURLParams = struct{ name string }{name: "url-params"}
 
 type Mux struct {
-	NotFoundHandler         func() http.Handler
-	MethodNotAllowedHandler func(allow []string) http.Handler
+	NotFoundHandler http.Handler
 
 	once          sync.Once
-	staticRoutes  map[string][]route
-	dynamicRoutes map[string][]route
+	staticRoutes  map[string]http.Handler
+	dynamicRoutes []dynamicRoute
 }
 
 // New returns a new Mux.
@@ -24,127 +23,86 @@ func New() *Mux {
 	return &Mux{}
 }
 
-type route struct {
-	method   string
-	pathname string
-	re       *regexp.Regexp
-	handler  http.Handler
+type dynamicRoute struct {
+	re      *regexp.Regexp
+	handler http.Handler
 }
 
 func (mux *Mux) init() {
 	mux.once.Do(func() {
 		if mux.NotFoundHandler == nil {
-			mux.NotFoundHandler = http.NotFoundHandler
-		}
-		if mux.MethodNotAllowedHandler == nil {
-			mux.MethodNotAllowedHandler = func(allow []string) http.Handler {
-				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					w.Header().Set("Allow", strings.Join(allow, ", "))
-					w.WriteHeader(http.StatusMethodNotAllowed)
-				})
-			}
+			mux.NotFoundHandler = http.NotFoundHandler()
 		}
 
-		mux.staticRoutes = map[string][]route{}
-		mux.dynamicRoutes = map[string][]route{}
+		mux.staticRoutes = map[string]http.Handler{}
+		mux.dynamicRoutes = []dynamicRoute{}
 	})
 }
 
-// Handle regosters a handler for the given method and pattern.
-func (mux *Mux) Handle(method, pattern string, handler http.Handler) {
+// Handle registers a handler for the given pattern.
+func (mux *Mux) Handle(pattern string, handler http.Handler) {
 	mux.init()
 
 	if !isPattern(pattern) {
-		mux.staticRoutes[pattern] = append(mux.staticRoutes[pattern], route{
-			method:   method,
-			pathname: pattern,
-			handler:  handler,
-		})
+		mux.staticRoutes[pattern] = handler
 		return
 	}
 
 	re := patternToRegExp(pattern)
-	mux.dynamicRoutes[pattern] = append(mux.dynamicRoutes[pattern], route{
-		method:  method,
+	mux.dynamicRoutes = append(mux.dynamicRoutes, dynamicRoute{
 		re:      re,
 		handler: handler,
 	})
 }
 
-// Handle regosters a handler function for the given method and pattern.
-func (mux *Mux) HandleFunc(method, pattern string, handler http.HandlerFunc) {
-	mux.Handle(method, pattern, handler)
+// Handle registers a handler function for the given pattern.
+func (mux *Mux) HandleFunc(pattern string, handler http.HandlerFunc) {
+	mux.Handle(pattern, handler)
 }
 
-// ServeHTTP dispatches the request to the handler whose method and pattern matches,
-// otherwise it responds with "not found" or "method not allowed" accordingly.
+// ServeHTTP dispatches the request to the handler whose pattern matches,
+// otherwise it responds with "not found".
 func (mux *Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := cleanPath(r.URL.Path)
-	routes, ok := mux.staticRoutes[path]
-	if ok {
-		var allow []string
-		for _, route := range routes {
-			if route.method != r.Method && route.method != "*" {
-				allow = append(allow, route.method)
-				continue
-			}
 
-			route.handler.ServeHTTP(w, r)
-			return
-		}
-
-		if allow != nil {
-			mux.MethodNotAllowedHandler(allow).ServeHTTP(w, r)
-			return
-		}
+	if handler, ok := mux.staticRoutes[path]; ok {
+		handler.ServeHTTP(w, r)
+		return
 	}
 
-	for _, routes := range mux.dynamicRoutes {
-		var allow []string
-		for _, route := range routes {
-			matches := route.re.FindAllStringSubmatch(path, -1)
-			if matches == nil {
-				break // all other routes in this map entry will have the same regexp.
-			}
+	for _, route := range mux.dynamicRoutes {
+		matches := route.re.FindAllStringSubmatch(path, -1)
+		if matches == nil {
+			continue
+		}
 
-			if route.method != r.Method && route.method != "*" {
-				allow = append(allow, route.method)
-				continue
-			}
-
-			groups := route.re.SubexpNames()
-			params := map[string]string{}
-			for _, match := range matches {
-				for i, value := range match {
-					if i >= len(groups) {
-						continue
-					}
-
-					name := groups[i]
-					if name == "" {
-						continue
-					}
-
-					params[name] = value
+		groups := route.re.SubexpNames()
+		params := map[string]string{}
+		for _, match := range matches {
+			for i, value := range match {
+				if i >= len(groups) {
+					continue
 				}
-			}
 
-			if len(params) != 0 {
-				route.handler.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), keyURLParams, params)))
-				return
-			}
+				name := groups[i]
+				if name == "" {
+					continue
+				}
 
-			route.handler.ServeHTTP(w, r)
+				params[name] = value
+			}
+		}
+
+		if len(params) != 0 {
+			route.handler.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), keyURLParams, params)))
 			return
 		}
 
-		if allow != nil {
-			mux.MethodNotAllowedHandler(allow).ServeHTTP(w, r)
-			return
-		}
+		route.handler.ServeHTTP(w, r)
+		return
 	}
 
-	mux.NotFoundHandler().ServeHTTP(w, r)
+	mux.NotFoundHandler.ServeHTTP(w, r)
 }
 
 // URLParam extracts an URL parameter previously defined in the URL pattern.
@@ -155,4 +113,25 @@ func URLParam(ctx context.Context, name string) string {
 	}
 
 	return params[name]
+}
+
+// MethodHandler maps each handler to the corresponding method.
+// Responds with "method not allowed" if none match.
+type MethodHandler map[string]http.HandlerFunc
+
+// ServeHTTP dispatches the request to the handler whose method matches,
+// otherwise it responds with "method not allowed".
+func (mh MethodHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	allow := make([]string, 0, len(mh))
+	for method, handler := range mh {
+		if method == r.Method {
+			handler(w, r)
+			return
+		}
+
+		allow = append(allow, method)
+	}
+
+	w.Header().Set("Allow", strings.Join(allow, ", "))
+	http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 }
