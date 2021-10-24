@@ -1,3 +1,5 @@
+[![Go Reference](https://pkg.go.dev/badge/github.com/nicolasparada/go-mux.svg)](https://pkg.go.dev/github.com/nicolasparada/go-mux)
+
 # Mux
 
 A golang HTTP request multiplexer.
