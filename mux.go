@@ -2,6 +2,7 @@ package mux
 
 import (
 	"context"
+	"embed"
 	"net/http"
 	"regexp"
 	"strings"
@@ -10,7 +11,7 @@ import (
 
 var keyURLParams = struct{ name string }{name: "url-params"}
 
-type Mux struct {
+type Router struct {
 	NotFoundHandler http.Handler
 
 	once          sync.Once
@@ -18,9 +19,9 @@ type Mux struct {
 	dynamicRoutes []dynamicRoute
 }
 
-// New returns a new Mux.
-func New() *Mux {
-	return &Mux{}
+// NewRouter returns a new Router.
+func NewRouter() *Router {
+	return &Router{}
 }
 
 type dynamicRoute struct {
@@ -28,7 +29,7 @@ type dynamicRoute struct {
 	handler http.Handler
 }
 
-func (mux *Mux) init() {
+func (mux *Router) init() {
 	mux.once.Do(func() {
 		if mux.NotFoundHandler == nil {
 			mux.NotFoundHandler = http.NotFoundHandler()
@@ -40,7 +41,7 @@ func (mux *Mux) init() {
 }
 
 // Handle registers a handler for the given pattern.
-func (mux *Mux) Handle(pattern string, handler http.Handler) {
+func (mux *Router) Handle(pattern string, handler http.Handler) {
 	mux.init()
 
 	if !isPattern(pattern) {
@@ -56,13 +57,15 @@ func (mux *Mux) Handle(pattern string, handler http.Handler) {
 }
 
 // Handle registers a handler function for the given pattern.
-func (mux *Mux) HandleFunc(pattern string, handler http.HandlerFunc) {
+func (mux *Router) HandleFunc(pattern string, handler http.HandlerFunc) {
 	mux.Handle(pattern, handler)
+	var x embed.FS
+	http.FileServer(http.FS(x))
 }
 
 // ServeHTTP dispatches the request to the handler whose pattern matches,
 // otherwise it responds with "not found".
-func (mux *Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (mux *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := cleanPath(r.URL.Path)
 
 	if handler, ok := mux.staticRoutes[path]; ok {

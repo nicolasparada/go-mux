@@ -11,7 +11,8 @@ const (
 	wildcardCaptureGroup = `(.*)`
 )
 
-var patternIdentifiers = []string{"*", "{", "}"}
+var patternIdentifiers = [...]string{"*", "{", "}"}
+
 var (
 	reCurlyBraces = regexp.MustCompile(`\{([^}]+)\}`)
 	reWildcard    = regexp.MustCompile(`\*`)

@@ -5,63 +5,62 @@ A golang HTTP request multiplexer.
 ## Install
 
 ```bash
-go get github.com/nicolasparada/go-mux
+go get github.com/nicolasparada/go-router
 ```
 
 ## Usage
 
- - **Simple**: familiar API using `http.Handler` and `http.HandlerFunc` interfaces.
+**Simple**: familiar API using `http.Handler` and `http.HandlerFunc` interfaces.
 ```go
 func main() {
-  m := mux.New()
-  m.Handle("/test", testHandler)
+  r := mux.NewRouter()
+  r.Handle("/test", test)
 
-  http.ListenAndServe(":5000", m)
+  http.ListenAndServe(":5000", r)
 }
 ```
 
- -  **URL param**: capture URL parameters with `{myParam}` notation, and access
+**URL param**: capture URL parameters with `{myParam}` notation, and access
  them with `mux.URLParam(ctx, "myParam")`.
 ```go
 func main() {
-  m := mux.New()
-  m.HandleFunc("/hello/{name}", helloHandler)
+  r := mux.NewRouter()
+  r.HandleFunc("/hello/{name}", hello)
 
-  http.ListenAndServe(":5000", m)
+  http.ListenAndServe(":5000", r)
 }
 
-func helloHandler(w http.ResponseWriter, r *http.Request) {
-    ctx := r.Context()
-    name := mux.URLParam(ctx, "name")
+func hello(w http.ResponseWriter, r *http.Request) {
+    name := mux.URLParam(r.Context(), "name")
     fmt.Fprintf(w, "Hello, %s", name)
 }
 ```
 
- - **Wildcard**: match anything with `*`.
+**Wildcard**: match anything with `*`.
 ```go
 func main() {
-  m := mux.New()
-  m.Handle("/*", http.FileServer(http.Dir("static")))
+  r := mux.NewRouter()
+  r.Handle("/*", http.FileServer(http.FS(static)))
 
-  http.ListenAndServe(":5000", m)
+  http.ListenAndServe(":5000", r)
 }
 ```
 
- - **REST**: mux by HTTP method using `mux.MethodHandler`.
+**REST**: mux by HTTP method using `mux.MethodHandler`.
  It will respond with `405` `Method Not Allowed` for you if none match.
 ```go
 func main() {
-  m := mux.New()
-  m.Handle("/api/todos", mux.MethodHandler{
-    http.MethodPost: createTodoHandler,
-    http.MethodGet:  todosHandler,
+  r := mux.NewRouter()
+  r.Handle("/api/todos", mux.MethodHandler{
+    http.MethodPost: createTodo,
+    http.MethodGet:  todos,
   })
-  m.Handle("/api/todos/{todoID}", mux.MethodHandler{
-    http.MethodGet:    todoHandler,
-    http.MethodPatch:  updateTodoHandler,
-    http.MethodDelete: deleteTodoHandler,
+  r.Handle("/api/todos/{todoID}", mux.MethodHandler{
+    http.MethodGet:    todo,
+    http.MethodPatch:  updateTodo,
+    http.MethodDelete: deleteTodo,
   })
 
-  http.ListenAndServe(":5000", m)
+  http.ListenAndServe(":5000", r)
 }
 ```

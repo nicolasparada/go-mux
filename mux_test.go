@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestMux_HandleFunc(t *testing.T) {
+func TestRouter_HandleFunc(t *testing.T) {
 	tt := []struct {
 		name       string
 		pattern    string
@@ -81,8 +81,8 @@ func TestMux_HandleFunc(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var gotCalled bool
 
-			mux := &Mux{}
-			mux.HandleFunc(tc.pattern, func(w http.ResponseWriter, r *http.Request) {
+			router := &Router{}
+			router.HandleFunc(tc.pattern, func(w http.ResponseWriter, r *http.Request) {
 				gotCalled = true
 
 				var gotParams map[string]string
@@ -100,10 +100,10 @@ func TestMux_HandleFunc(t *testing.T) {
 				}
 			})
 
-			srv := httptest.NewServer(mux)
+			srv := httptest.NewServer(router)
 			defer srv.Close()
 
-			req, err := http.NewRequest(http.MethodGet, srv.URL+tc.requestURL, nil)
+			req, err := http.NewRequest(http.MethodGet, srv.URL+tc.requestURL, http.NoBody)
 			if err != nil {
 				t.Error(err)
 				return
@@ -157,10 +157,10 @@ func TestMethodHandler_ServeHTTP(t *testing.T) {
 				gotCalled = true
 				w.WriteHeader(http.StatusOK)
 			}}
-			mux := &Mux{}
-			mux.Handle("/", mh)
+			router := &Router{}
+			router.Handle("/", mh)
 
-			srv := httptest.NewServer(mux)
+			srv := httptest.NewServer(router)
 			defer srv.Close()
 
 			req, err := http.NewRequest(tc.requestMethod, srv.URL, nil)
