@@ -18,7 +18,7 @@ func main() {
   r := mux.NewRouter()
   r.Handle("/test", test)
 
-  http.ListenAndServe(":5000", r)
+  http.ListenAndServe(":4000", r)
 }
 ```
 
@@ -29,7 +29,7 @@ func main() {
   r := mux.NewRouter()
   r.HandleFunc("/hello/{name}", hello)
 
-  http.ListenAndServe(":5000", r)
+  http.ListenAndServe(":4000", r)
 }
 
 func hello(w http.ResponseWriter, r *http.Request) {
@@ -44,7 +44,7 @@ func main() {
   r := mux.NewRouter()
   r.Handle("/*", http.FileServer(http.FS(static)))
 
-  http.ListenAndServe(":5000", r)
+  http.ListenAndServe(":4000", r)
 }
 ```
 
@@ -63,6 +63,6 @@ func main() {
     http.MethodDelete: deleteTodo,
   })
 
-  http.ListenAndServe(":5000", r)
+  http.ListenAndServe(":4000", r)
 }
 ```
