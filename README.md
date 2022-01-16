@@ -7,7 +7,7 @@ A golang HTTP request multiplexer.
 ## Install
 
 ```bash
-go get github.com/nicolasparada/go-router
+go get github.com/nicolasparada/go-mux
 ```
 
 ## Usage

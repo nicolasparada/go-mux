@@ -1,3 +1,3 @@
-module github.com/nicolasparada/go-router
+module github.com/nicolasparada/go-mux
 
 go 1.17
