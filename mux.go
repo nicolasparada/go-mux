@@ -29,46 +29,44 @@ type dynamicRoute struct {
 	handler http.Handler
 }
 
-func (mux *Router) init() {
+func (r *Router) init() {
 	mux.once.Do(func() {
-		if mux.NotFoundHandler == nil {
-			mux.NotFoundHandler = http.NotFoundHandler()
+		if r.NotFoundHandler == nil {
+			r.NotFoundHandler = http.NotFoundHandler()
 		}
 
-		mux.staticRoutes = map[string]http.Handler{}
-		mux.dynamicRoutes = []dynamicRoute{}
+		r.staticRoutes = map[string]http.Handler{}
+		r.dynamicRoutes = []dynamicRoute{}
 	})
 }
 
 // Handle registers a handler for the given pattern.
-func (mux *Router) Handle(pattern string, handler http.Handler) {
-	mux.init()
+func (r *Router) Handle(pattern string, handler http.Handler) {
+	r.init()
 
 	if !isPattern(pattern) {
-		mux.staticRoutes[pattern] = handler
+		r.staticRoutes[pattern] = handler
 		return
 	}
 
 	re := patternToRegExp(pattern)
-	mux.dynamicRoutes = append(mux.dynamicRoutes, dynamicRoute{
+	r.dynamicRoutes = append(r.dynamicRoutes, dynamicRoute{
 		re:      re,
 		handler: handler,
 	})
 }
 
 // Handle registers a handler function for the given pattern.
-func (mux *Router) HandleFunc(pattern string, handler http.HandlerFunc) {
-	mux.Handle(pattern, handler)
-	var x embed.FS
-	http.FileServer(http.FS(x))
+func (r *Router) HandleFunc(pattern string, handler http.HandlerFunc) {
+	r.Handle(pattern, handler)
 }
 
 // ServeHTTP dispatches the request to the handler whose pattern matches,
 // otherwise it responds with "not found".
-func (mux *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (r *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := cleanPath(r.URL.Path)
 
-	if handler, ok := mux.staticRoutes[path]; ok {
+	if handler, ok := r.staticRoutes[path]; ok {
 		handler.ServeHTTP(w, r)
 		return
 	}
@@ -105,7 +103,7 @@ func (mux *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mux.NotFoundHandler.ServeHTTP(w, r)
+	r.NotFoundHandler.ServeHTTP(w, r)
 }
 
 // URLParam extracts an URL parameter previously defined in the URL pattern.
