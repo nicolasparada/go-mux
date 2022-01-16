@@ -2,7 +2,6 @@ package mux
 
 import (
 	"context"
-	"embed"
 	"net/http"
 	"regexp"
 	"strings"
@@ -30,7 +29,7 @@ type dynamicRoute struct {
 }
 
 func (r *Router) init() {
-	mux.once.Do(func() {
+	r.once.Do(func() {
 		if r.NotFoundHandler == nil {
 			r.NotFoundHandler = http.NotFoundHandler()
 		}
@@ -63,15 +62,15 @@ func (r *Router) HandleFunc(pattern string, handler http.HandlerFunc) {
 
 // ServeHTTP dispatches the request to the handler whose pattern matches,
 // otherwise it responds with "not found".
-func (r *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	path := cleanPath(r.URL.Path)
+func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	path := cleanPath(req.URL.Path)
 
 	if handler, ok := r.staticRoutes[path]; ok {
-		handler.ServeHTTP(w, r)
+		handler.ServeHTTP(w, req)
 		return
 	}
 
-	for _, route := range mux.dynamicRoutes {
+	for _, route := range r.dynamicRoutes {
 		matches := route.re.FindAllStringSubmatch(path, -1)
 		if matches == nil {
 			continue
@@ -95,15 +94,15 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if len(params) != 0 {
-			route.handler.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), keyURLParams, params)))
+			route.handler.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), keyURLParams, params)))
 			return
 		}
 
-		route.handler.ServeHTTP(w, r)
+		route.handler.ServeHTTP(w, req)
 		return
 	}
 
-	r.NotFoundHandler.ServeHTTP(w, r)
+	r.NotFoundHandler.ServeHTTP(w, req)
 }
 
 // URLParam extracts an URL parameter previously defined in the URL pattern.

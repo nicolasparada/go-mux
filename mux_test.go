@@ -81,8 +81,8 @@ func TestRouter_HandleFunc(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var gotCalled bool
 
-			router := &Router{}
-			router.HandleFunc(tc.pattern, func(w http.ResponseWriter, r *http.Request) {
+			r := &Router{}
+			r.HandleFunc(tc.pattern, func(w http.ResponseWriter, r *http.Request) {
 				gotCalled = true
 
 				var gotParams map[string]string
@@ -100,7 +100,7 @@ func TestRouter_HandleFunc(t *testing.T) {
 				}
 			})
 
-			srv := httptest.NewServer(router)
+			srv := httptest.NewServer(r)
 			defer srv.Close()
 
 			req, err := http.NewRequest(http.MethodGet, srv.URL+tc.requestURL, http.NoBody)
@@ -109,7 +109,7 @@ func TestRouter_HandleFunc(t *testing.T) {
 				return
 			}
 
-			resp, err := http.DefaultClient.Do(req)
+			resp, err := srv.Client().Do(req)
 			if err != nil {
 				t.Error(err)
 				return
